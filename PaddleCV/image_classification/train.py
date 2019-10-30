@@ -233,15 +233,3 @@ def train(args):
             #For now, save model per epoch.
             if pass_id % args.save_step == 0:
                 save_model(args, exe, train_prog, pass_id)
-
-
-def main():
-    args = parse_args()
-    if int(os.getenv("PADDLE_TRAINER_ID", 0)) == 0:
-        print_arguments(args)
-    check_args(args)
-    train(args)
-
-
-if __name__ == '__main__':
-    main()
