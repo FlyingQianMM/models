@@ -29,108 +29,50 @@ import paddle.fluid as fluid
 import reader
 import models
 from utils import *
+from build_model import create_model
 
 
-def eval(args, startup_program, test_program):
-    image_shape = [int(m) for m in args.image_shape.split(",")]
+def validate(args, test_data_loader, exe, test_prog, test_fetch_list):
+    test_batch_time_record = []
+    test_batch_metrics_record = []
+    test_batch_id = 0
+    test_data_loader.start()
+    try:
+        while True:
+            t1 = time.time()
+            test_batch_metrics = exe.run(program=test_prog,
+                                         fetch_list=test_fetch_list)
+            t2 = time.time()
+            test_batch_elapse = t2 - t1
+            test_batch_time_record.append(test_batch_elapse)
 
-    model_list = [m for m in dir(models) if "__" not in m]
-    assert args.model in model_list, "{} is not in lists: {}".format(args.model,
-                                                                     model_list)
+            test_batch_metrics_avg = np.mean(
+                np.array(test_batch_metrics), axis=1)
+            test_batch_metrics_record.append(test_batch_metrics_avg)
 
-    image = fluid.data(
-        name='image', shape=[None] + image_shape, dtype='float32')
-    label = fluid.data(name='label', shape=[None, 1], dtype='int64')
-
-    # model definition
-    if args.model.startswith('EfficientNet'):
-        model = models.__dict__[args.model](is_test=True,
-                                            padding_type=args.padding_type,
-                                            use_se=args.use_se)
-    else:
-        model = models.__dict__[args.model]()
-
-    if args.model == "GoogLeNet":
-        out0, out1, out2 = model.net(input=image, class_dim=args.class_dim)
-        cost0 = fluid.layers.cross_entropy(input=out0, label=label)
-        cost1 = fluid.layers.cross_entropy(input=out1, label=label)
-        cost2 = fluid.layers.cross_entropy(input=out2, label=label)
-        avg_cost0 = fluid.layers.mean(x=cost0)
-        avg_cost1 = fluid.layers.mean(x=cost1)
-        avg_cost2 = fluid.layers.mean(x=cost2)
-
-        avg_cost = avg_cost0 + 0.3 * avg_cost1 + 0.3 * avg_cost2
-        acc_top1 = fluid.layers.accuracy(input=out0, label=label, k=1)
-        acc_top5 = fluid.layers.accuracy(input=out0, label=label, k=5)
-    else:
-        out = model.net(input=image, class_dim=args.class_dim)
-
-        cost, pred = fluid.layers.softmax_with_cross_entropy(
-            out, label, return_softmax=True)
-        avg_cost = fluid.layers.mean(x=cost)
-        acc_top1 = fluid.layers.accuracy(input=pred, label=label, k=1)
-        acc_top5 = fluid.layers.accuracy(input=pred, label=label, k=5)
-
-#     test_program = fluid.default_main_program().clone(for_test=True)
-
-    fetch_list = [avg_cost.name, acc_top1.name, acc_top5.name]
-
-    place = fluid.CUDAPlace(0) if args.use_gpu else fluid.CPUPlace()
-    exe = fluid.Executor(place)
-    exe.run(startup_program)
-
-    imagenet_reader = reader.ImageNetReader()
-    val_reader = imagenet_reader.val(settings=args)
-    place = fluid.CUDAPlace(0) if args.use_gpu else fluid.CPUPlace()
-    feeder = fluid.DataFeeder(place=place, feed_list=[image, label])
-    
-    
-
-#     for block in test_program.blocks:
-#         for param in block.all_parameters():
-#             pd_var = fluid.global_scope().find_var(param.name)
-#             pd_param = pd_var.get_tensor()
-#             pd_param.set(weights[param.name], place)
-    
-    test_info = [[], [], []]
-    cnt = 0
-    for batch_id, data in enumerate(val_reader()):
-        t1 = time.time()
-        loss, acc1, acc5 = exe.run(test_program,
-                                   fetch_list=fetch_list,
-                                   feed=feeder.feed(data))
-        t2 = time.time()
-        period = t2 - t1
-        loss = np.mean(loss)
-        acc1 = np.mean(acc1)
-        acc5 = np.mean(acc5)
-        test_info[0].append(loss * len(data))
-        test_info[1].append(acc1 * len(data))
-        test_info[2].append(acc5 * len(data))
-        cnt += len(data)
-        if batch_id % 10 == 0:
-            print("Testbatch {0},loss {1}, "
-                  "acc1 {2},acc5 {3},time {4}".format(batch_id, \
-                  "%.5f"%loss,"%.5f"%acc1, "%.5f"%acc5, \
-                  "%2.2f sec" % period))
+            print_info("eval", test_batch_id, args.print_step,
+                       test_batch_metrics_avg, test_batch_elapse, "batch")
             sys.stdout.flush()
+            test_batch_id += 1
 
-    test_loss = np.sum(test_info[0]) / cnt
-    test_acc1 = np.sum(test_info[1]) / cnt
-    test_acc5 = np.sum(test_info[2]) / cnt
+    except fluid.core.EOFException:
+        test_data_loader.reset()
 
-    print("Test_loss {0}, test_acc1 {1}, test_acc5 {2}".format(
-        "%.5f" % test_loss, "%.5f" % test_acc1, "%.5f" % test_acc5))
-    sys.stdout.flush()
-
-
-def main():
-    args = parser.parse_args()
-    print_arguments(args)
-    check_gpu()
-    check_version()
-    eval(args)
+    test_epoch_time_avg = np.mean(np.array(test_batch_time_record))
+    test_epoch_metrics_avg = np.mean(
+        np.array(test_batch_metrics_record), axis=0)
+    loss, acc1, acc5 = list(test_epoch_metrics_avg)
+    print("Eval results: eval_loss {}, eval_acc1 {}, eval_acc5 {}".format( \
+            str(loss), str(acc1), str(acc5)))
 
 
-if __name__ == '__main__':
-    main()
+def eval(args, startup_program, test_program, test_data_loader,
+         test_fetch_list):
+    gpu_id = int(os.environ.get('FLAGS_selected_gpus', 0))
+    place = fluid.CUDAPlace(gpu_id) if args.use_gpu else fluid.CPUPlace()
+    exe = fluid.Executor(place)
+    num_trainers = int(os.environ.get('PADDLE_TRAINERS_NUM', 1))
+    imagenet_reader = reader.ImageNetReader(0 if num_trainers > 1 else None)
+    test_reader = imagenet_reader.val(settings=args)
+    test_data_loader.set_sample_list_generator(test_reader, place)
+    validate(args, test_data_loader, exe, test_program, test_fetch_list)

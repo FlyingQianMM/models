@@ -31,72 +31,32 @@ import models
 from utils import *
 
 
+def inference(args, test_data_loader, exe, test_prog, test_fetch_list):
+    test_batch_time_record = []
+    test_batch_metrics_record = []
+    test_batch_id = 0
+    test_data_loader.start()
+    try:
+        while True:
+            t1 = time.time()
+            result = exe.run(program=test_prog, fetch_list=test_fetch_list)
+            t2 = time.time()
+            test_batch_elapse = t2 - t1
+            result = result[0][0]
+            pred_label = np.argsort(result)[::-1][:args.topk]
+            print(pred_label)
 
-def infer(args, startup_program, test_program):
-    image_shape = [int(m) for m in args.image_shape.split(",")]
-    model_list = [m for m in dir(models) if "__" not in m]
-    assert args.model in model_list, "{} is not in lists: {}".format(args.model,
-                                                                     model_list)
-    image = fluid.data(
-        name='image', shape=[None] + image_shape, dtype='float32')
-
-    if args.model.startswith('EfficientNet'):
-        model = models.__dict__[args.model](is_test=True,
-                                            padding_type=args.padding_type,
-                                            use_se=args.use_se)
-    else:
-        model = models.__dict__[args.model]()
-
-    if args.model == "GoogLeNet":
-        out, _, _ = model.net(input=image, class_dim=args.class_dim)
-    else:
-        out = model.net(input=image, class_dim=args.class_dim)
-        out = fluid.layers.softmax(out)
+    except fluid.core.EOFException:
+        test_data_loader.reset()
 
 
-    fetch_list = [out.name]
-
-    place = fluid.CUDAPlace(0) if args.use_gpu else fluid.CPUPlace()
+def infer(args, startup_program, test_program, test_data_loader,
+          test_fetch_list):
+    gpu_id = int(os.environ.get('FLAGS_selected_gpus', 0))
+    place = fluid.CUDAPlace(gpu_id) if args.use_gpu else fluid.CPUPlace()
     exe = fluid.Executor(place)
-    exe.run(startup_program)
-
-
-    place = fluid.CUDAPlace(0) if args.use_gpu else fluid.CPUPlace()
-    args.test_batch_size = 1
-    imagenet_reader = reader.ImageNetReader()
+    num_trainers = int(os.environ.get('PADDLE_TRAINERS_NUM', 1))
+    imagenet_reader = reader.ImageNetReader(0 if num_trainers > 1 else None)
     test_reader = imagenet_reader.test(settings=args)
-    feeder = fluid.DataFeeder(place=place, feed_list=[image])
-
-    TOPK = args.topk
-    assert os.path.exists(args.label_path), "Index file doesn't exist!"
-    f = open(args.label_path)
-    label_dict = {}
-    for item in f.readlines():
-        key = item.split(" ")[0]
-        value = [l.replace("\n", "") for l in item.split(" ")[1:]]
-        label_dict[key] = value
-
-#     for block in test_program.blocks:
-#         for param in block.all_parameters():
-#             pd_var = fluid.global_scope().find_var(param.name)
-#             pd_param = pd_var.get_tensor()
-#             pd_param.set(weights[param.name], place)
-            
-    
-    for batch_id, data in enumerate(test_reader()):
-        result = exe.run(test_program,
-                         fetch_list=fetch_list,
-                         feed=feeder.feed(data))
-        result = result[0][0]
-        pred_label = np.argsort(result)[::-1][:TOPK]
-        print(pred_label)
-        '''
-        readable_pred_label = []
-        for label in pred_label:
-            readable_pred_label.append(label_dict[str(label)])
-        print("Test-{0}-score: {1}, class{2} {3}".format(batch_id, result[
-            pred_label], pred_label, readable_pred_label))
-        sys.stdout.flush()
-        '''
-
-    print(np.array(fluid.global_scope().find_var('bn2a_branch1_mean').get_tensor()))
+    test_data_loader.set_sample_list_generator(test_reader, place)
+    inference(args, test_data_loader, exe, test_program, test_fetch_list)

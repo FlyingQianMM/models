@@ -1,4 +1,4 @@
-##copyright (c) 2019 PaddlePaddle Authors. All Rights Reserve.
+#copyright (c) 2019 PaddlePaddle Authors. All Rights Reserve.
 #
 #Licensed under the Apache License, Version 2.0 (the "License");
 #you may not use this file except in compliance with the License.
@@ -46,13 +46,11 @@ from build_model import create_model
 
 def build_program(is_train, main_prog, startup_prog, args):
     """build program, and add grad op in program accroding to different mode
-
     Args:
         is_train: mode: train or test
         main_prog: main program
         startup_prog: strartup program
         args: arguments
-
     Returns : 
         train mode: [Loss, global_lr, data_loader]
         test mode: [Loss, data_loader]
@@ -73,7 +71,7 @@ def build_program(is_train, main_prog, startup_prog, args):
             main_prog.random_seed = args.random_seed
             startup_prog.random_seed = args.random_seed
         with fluid.unique_name.guard():
-            data_loader, loss_out = create_model(model, args, is_train)
+            data_loader, loss_out, res_out = create_model(model, args, is_train)
             # add backward op in program
             if is_train:
                 optimizer = create_optimizer(args)
@@ -91,7 +89,7 @@ def build_program(is_train, main_prog, startup_prog, args):
                     ema.update()
                     loss_out.append(ema)
             loss_out.append(data_loader)
-    return loss_out
+    return loss_out, res_out
 
 
 def validate(args, test_data_loader, exe, test_prog, test_fetch_list, pass_id,
@@ -143,7 +141,7 @@ def train(args):
     train_prog = fluid.Program()
     test_prog = fluid.Program()
 
-    train_out = build_program(
+    train_out, res_out = build_program(
         is_train=True,
         main_prog=train_prog,
         startup_prog=startup_prog,
@@ -157,7 +155,7 @@ def train(args):
 
     train_fetch_list = [var.name for var in train_fetch_vars]
 
-    test_out = build_program(
+    test_out, res_out = build_program(
         is_train=False,
         main_prog=test_prog,
         startup_prog=startup_prog,
@@ -233,11 +231,5 @@ def train(args):
             #For now, save model per epoch.
             if pass_id % args.save_step == 0:
                 save_model(args, exe, train_prog, pass_id)
-                
-    weights = {}
-    for block in train_prog.blocks:
-        for param in block.all_parameters():
-            pd_var = fluid.global_scope().find_var(param.name)
-            pd_param = pd_var.get_tensor()
-            weights[param.name] = np.array(pd_param)
-    return weights
+
+    return [startup_prog, test_prog, test_data_loader, test_fetch_list, res_out]
