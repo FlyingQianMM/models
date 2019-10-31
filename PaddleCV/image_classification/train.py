@@ -1,4 +1,4 @@
-#copyright (c) 2019 PaddlePaddle Authors. All Rights Reserve.
+##copyright (c) 2019 PaddlePaddle Authors. All Rights Reserve.
 #
 #Licensed under the Apache License, Version 2.0 (the "License");
 #you may not use this file except in compliance with the License.
@@ -233,3 +233,11 @@ def train(args):
             #For now, save model per epoch.
             if pass_id % args.save_step == 0:
                 save_model(args, exe, train_prog, pass_id)
+                
+    weights = {}
+    for block in train_prog.blocks:
+        for param in block.all_parameters():
+            pd_var = fluid.global_scope().find_var(param.name)
+            pd_param = pd_var.get_tensor()
+            weights[param.name] = np.array(pd_param)
+    return weights

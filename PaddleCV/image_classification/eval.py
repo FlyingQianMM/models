@@ -30,38 +30,13 @@ import reader
 import models
 from utils import *
 
-parser = argparse.ArgumentParser(description=__doc__)
-add_arg = functools.partial(add_arguments, argparser=parser)
-# yapf: disable
-add_arg('data_dir',         str,  "./data/ILSVRC2012/", "The ImageNet datset")
-add_arg('batch_size',       int,  256,                  "Minibatch size.")
-add_arg('use_gpu',          bool, True,                 "Whether to use GPU or not.")
-add_arg('class_dim',        int,  1000,                 "Class number.")
-add_arg('image_shape',      str,  "3,224,224",          "Input image size")
-parser.add_argument("--pretrained_model", default=None, required=True, type=str, help="The path to load pretrained model")
-add_arg('model',            str,  "ResNet50", "Set the network to use.")
-add_arg('resize_short_size', int, 256,                  "Set resize short size")
-add_arg('reader_thread',    int,  8,                    "The number of multi thread reader")
-add_arg('reader_buf_size',  int,  2048,                 "The buf size of multi thread reader")
-parser.add_argument('--image_mean', nargs='+', type=float, default=[0.485, 0.456, 0.406], help="The mean of input image data")
-parser.add_argument('--image_std', nargs='+', type=float, default=[0.229, 0.224, 0.225], help="The std of input image data")
-add_arg('crop_size',        int,  224,                  "The value of crop size")
-add_arg('interpolation',    int,  None,                 "The interpolation mode")
-add_arg('padding_type',     str,  "SAME",               "Padding type of convolution")
-add_arg('use_se',           bool, True,                 "Whether to use Squeeze-and-Excitation module for EfficientNet.")
-# yapf: enable
 
-
-def eval(args):
+def eval(args, startup_program, test_program):
     image_shape = [int(m) for m in args.image_shape.split(",")]
 
     model_list = [m for m in dir(models) if "__" not in m]
     assert args.model in model_list, "{} is not in lists: {}".format(args.model,
                                                                      model_list)
-    assert os.path.isdir(
-        args.pretrained_model
-    ), "{} doesn't exist, please load right pretrained model path for eval".format(
-        args.pretrained_model)
 
     image = fluid.data(
         name='image', shape=[None] + image_shape, dtype='float32')
@@ -96,20 +71,27 @@ def eval(args):
         acc_top1 = fluid.layers.accuracy(input=pred, label=label, k=1)
         acc_top5 = fluid.layers.accuracy(input=pred, label=label, k=5)
 
-    test_program = fluid.default_main_program().clone(for_test=True)
+#     test_program = fluid.default_main_program().clone(for_test=True)
 
     fetch_list = [avg_cost.name, acc_top1.name, acc_top5.name]
 
     place = fluid.CUDAPlace(0) if args.use_gpu else fluid.CPUPlace()
     exe = fluid.Executor(place)
-    exe.run(fluid.default_startup_program())
+    exe.run(startup_program)
 
-    fluid.io.load_persistables(exe, args.pretrained_model)
     imagenet_reader = reader.ImageNetReader()
     val_reader = imagenet_reader.val(settings=args)
-
+    place = fluid.CUDAPlace(0) if args.use_gpu else fluid.CPUPlace()
     feeder = fluid.DataFeeder(place=place, feed_list=[image, label])
+    
+    
 
+#     for block in test_program.blocks:
+#         for param in block.all_parameters():
+#             pd_var = fluid.global_scope().find_var(param.name)
+#             pd_param = pd_var.get_tensor()
+#             pd_param.set(weights[param.name], place)
+    
     test_info = [[], [], []]
     cnt = 0
     for batch_id, data in enumerate(val_reader()):

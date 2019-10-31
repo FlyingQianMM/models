@@ -263,7 +263,8 @@ class ImageNetReader:
                         shuffle=False,
                         color_jitter=False,
                         rotate=False,
-                        data_dir=None):
+                        data_dir=None,
+                        img_file=None):
         num_trainers = int(os.environ.get('PADDLE_TRAINERS_NUM', 1))
         if mode == 'test':
             batch_size = 1
@@ -290,12 +291,18 @@ class ImageNetReader:
                     img_path = os.path.join(data_dir, img_path)
                     batch_data.append([img_path, int(label)])
                     if len(batch_data) == batch_size:
-                        if mode == 'train' or mode == 'val' or mode == 'test':
-                            yield batch_data
-
+                        yield batch_data
                         batch_data = []
+            
+            def read_image_file():
+                batch_data = []
+                batch_data.append([img_file])
+                yield batch_data
 
-            return read_file_list
+            if mode == 'train' or mode == 'val':
+                return read_file_list
+            else:
+                return read_image_file
 
         data_reader = reader()
         if mode == 'train' and num_trainers > 1:
@@ -384,9 +391,9 @@ class ImageNetReader:
         Returns:
             test reader
         """
-        file_list = os.path.join(settings.data_dir, 'val_list.txt')
+        img_file = settings.img_file
         assert os.path.isfile(
-            file_list), "{} doesn't exist, please check data list path".format(
+            img_file), "{} doesn't exist, please check image file path".format(
                 file_list)
         return self._reader_creator(
-            settings, file_list, 'test', shuffle=False, data_dir=settings.data_dir)
+            settings, None, 'test', shuffle=False, data_dir=settings.data_dir, img_file=img_file)

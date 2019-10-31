@@ -142,6 +142,11 @@ def parse_args():
     add_arg('padding_type',             str,    "SAME",                 "Padding type of convolution")
     add_arg('use_se',                   bool,   True,                   "Whether to use Squeeze-and-Excitation module for EfficientNet.")
     # yapf: enable
+    
+    # infer configs
+    add_arg('topk',             int,  1,                    "topk")
+    add_arg('label_path',       str,  "./utils/tools/readable_label.txt", "readable label filepath")
+    add_arg('img_file',       str,  "./test.jpg", "the path of test image file")
 
     args = parser.parse_args()
 
