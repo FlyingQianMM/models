@@ -26,6 +26,7 @@ import sys
 import os
 import warnings
 import signal
+import easydict
 
 import paddle
 import paddle.fluid as fluid
@@ -35,116 +36,59 @@ from paddle.fluid import unique_name, layers
 from utils import dist_utils
 
 
-def print_arguments(args):
-    """Print argparse's arguments.
-
-    Usage:
-
-    .. code-block:: python
-
-        parser = argparse.ArgumentParser()
-        parser.add_argument("name", default="Jonh", type=str, help="User name.")
-        args = parser.parse_args()
-        print_arguments(args)
-
-    :param args: Input argparse.Namespace for printing.
-    :type args: argparse.Namespace
-    """
-    print("-------------  Configuration Arguments -------------")
-    for arg, value in sorted(six.iteritems(vars(args))):
-        print("%25s : %s" % (arg, value))
-    print("----------------------------------------------------")
-
-
-def add_arguments(argname, type, default, help, argparser, **kwargs):
-    """Add argparse's argument. 
-
-    Usage:
-
-    .. code-block:: python
-
-        parser = argparse.ArgumentParser()
-        add_argument("name", str, "Jonh", "User name.", parser)
-        args = parser.parse_args()
-    """
-    type = distutils.util.strtobool if type == bool else type
-    argparser.add_argument(
-        "--" + argname,
-        default=default,
-        type=type,
-        help=help + ' Default: %(default)s.',
-        **kwargs)
-
-
 def parse_args():
     """Add arguments
 
     Returns: 
         all training args
     """
-    parser = argparse.ArgumentParser(description=__doc__)
-    add_arg = functools.partial(add_arguments, argparser=parser)
-    # yapf: disable
-
-    # ENV
-    add_arg('use_gpu',                  bool,   True,                   "Whether to use GPU.")
-    add_arg('model_save_dir',           str,    "./output",        "The directory path to save model.")
-    add_arg('data_dir',                 str,    "./data/ILSVRC2012/",   "The ImageNet dataset root directory.")
-    add_arg('pretrained_model',         str,    None,                   "Whether to load pretrained model.")
-    add_arg('checkpoint',               str,    None,                   "Whether to resume checkpoint.")
-    add_arg('print_step',               int,    10,                     "The steps interval to print logs")
-    add_arg('save_step',                int,    1,                      "The steps interval to save checkpoints")
-
-    # SOLVER AND HYPERPARAMETERS
-    add_arg('model',                    str,    "ResNet50",   "The name of network.")
-    add_arg('total_images',             int,    1281167,                "The number of total training images.")
-    add_arg('num_epochs',               int,    120,                    "The number of total epochs.")
-    add_arg('class_dim',                int,    1000,                   "The number of total classes.")
-    add_arg('image_shape',              str,    "3,224,224",            "The size of Input image, order: [channels, height, weidth] ")
-    add_arg('batch_size',               int,    8,                      "Minibatch size on a device.")
-    add_arg('test_batch_size',          int,    16,                     "Test batch size on a deveice.")
-    add_arg('lr',                       float,  0.1,                    "The learning rate.")
-    add_arg('lr_strategy',              str,    "piecewise_decay",      "The learning rate decay strategy.")
-    add_arg('l2_decay',                 float,  1e-4,                   "The l2_decay parameter.")
-    add_arg('momentum_rate',            float,  0.9,                    "The value of momentum_rate.")
-    add_arg('warm_up_epochs',           float,  5.0,                    "The value of warm up epochs")
-    add_arg('decay_epochs',             float,  2.4,                    "Decay epochs of exponential decay learning rate scheduler")
-    add_arg('decay_rate',               float,  0.97,                   "Decay rate of exponential decay learning rate scheduler")
-    add_arg('drop_connect_rate',        float,  0.2,                    "The value of drop connect rate")
-    parser.add_argument('--step_epochs', nargs='+', type=int, default=[30, 60, 90], help="piecewise decay step")
-
-    # READER AND PREPROCESS
-    add_arg('lower_scale',              float,  0.08,                   "The value of lower_scale in ramdom_crop")
-    add_arg('lower_ratio',              float,  3./4.,                  "The value of lower_ratio in ramdom_crop")
-    add_arg('upper_ratio',              float,  4./3.,                  "The value of upper_ratio in ramdom_crop")
-    add_arg('resize_short_size',        int,    256,                    "The value of resize_short_size")
-    add_arg('crop_size',                int,    224,                    "The value of crop size")
-    add_arg('use_mixup',                bool,   False,                  "Whether to use mixup")
-    add_arg('mixup_alpha',              float,  0.2,                    "The value of mixup_alpha")
-    add_arg('reader_thread',            int,    8,                      "The number of multi thread reader")
-    add_arg('reader_buf_size',          int,    2048,                   "The buf size of multi thread reader")
-    add_arg('interpolation',            int,    None,                   "The interpolation mode")
-    add_arg('use_aa',                   bool,   False,                  "Whether to use auto augment")
-    parser.add_argument('--image_mean', nargs='+', type=float, default=[0.485, 0.456, 0.406], help="The mean of input image data")
-    parser.add_argument('--image_std', nargs='+', type=float, default=[0.229, 0.224, 0.225], help="The std of input image data")
-
-    # SWITCH
-    #NOTE: (2019/08/08) FP16 is moving to PaddlePaddle/Fleet now
-    #add_arg('use_fp16',                 bool,   False,                  "Whether to enable half precision training with fp16." )
-    #add_arg('scale_loss',               float,  1.0,                    "The value of scale_loss for fp16." )
-    add_arg('use_label_smoothing',      bool,   False,                  "Whether to use label_smoothing")
-    add_arg('label_smoothing_epsilon',  float,  0.1,                    "The value of label_smoothing_epsilon parameter")
-    #NOTE: (2019/08/08) temporary disable use_distill
-    #add_arg('use_distill',              bool,   False,                  "Whether to use distill")
-    add_arg('random_seed',              int,    None,                   "random seed")
-    add_arg('use_ema',                  bool,   False,                  "Whether to use ExponentialMovingAverage.")
-    add_arg('ema_decay',                float,  0.9999,                 "The value of ema decay rate")
-    add_arg('padding_type',             str,    "SAME",                 "Padding type of convolution")
-    add_arg('use_se',                   bool,   True,                   "Whether to use Squeeze-and-Excitation module for EfficientNet.")
-    # yapf: enable
-
-    args = parser.parse_args()
-
+    args = easydict.EasyDict({
+        "use_gpu": True,
+        "model_save_dir": "./output",
+        "data_dir": "./data/ILSVRC2012/",
+        "pretrained_model": None,
+        "checkpoint": None,
+        "print_step": 10,
+        "save_step": 1,
+        "model": "ResNet50",
+        "total_images": 1281167,
+        "num_epochs": 120,
+        "class_dim": 1000,
+        "image_shape": "3,224,224",
+        "batch_size": 8,
+        "test_batch_size": 16,
+        "lr": 0.1,
+        "lr_strategy": "piecewise_decay",
+        "l2_decay": 1e-04,
+        "momentum_rate": 0.9,
+        "warm_up_epochs": 5.0,
+        "decay_epochs": 2.4,
+        "decay_rate": 0.97,
+        "drop_connect_rate": 0.2,
+        "step_epochs": [30, 60, 90],
+        "lower_scale": 0.08,
+        "lower_ratio": 3. / 4,
+        "upper_ratio": 4. / 3,
+        "resize_short_size": 256,
+        "crop_size": 224,
+        "use_mixup": False,
+        "mixup_alpha": 0.2,
+        "reader_thread": 8,
+        "reader_buf_size": 2048,
+        "interpolation": None,
+        "use_aa": False,
+        "image_mean": [0.485, 0.456, 0.406],
+        "image_std": [0.229, 0.224, 0.225],
+        "use_label_smoothing": False,
+        "label_smoothing_epsilon": 0.1,
+        "random_seed": None,
+        "use_ema": False,
+        "ema_decay": 0.9999,
+        "padding_type": "SAME",
+        "use_se": True,
+        "img_file": "",
+        "topk": 1,
+    })
     return args
 
 

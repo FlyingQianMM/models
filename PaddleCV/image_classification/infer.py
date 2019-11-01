@@ -30,109 +30,33 @@ import reader
 import models
 from utils import *
 
-parser = argparse.ArgumentParser(description=__doc__)
-# yapf: disable
-add_arg = functools.partial(add_arguments, argparser=parser)
-add_arg('data_dir',         str,  "./data/ILSVRC2012/", "The ImageNet data")
-add_arg('use_gpu',          bool, True,                 "Whether to use GPU or not.")
-add_arg('class_dim',        int,  1000,                 "Class number.")
-add_arg('image_shape',      str,  "3,224,224",          "Input image size")
-parser.add_argument("--pretrained_model", default=None, required=True, type=str, help="The path to load pretrained model")
-add_arg('model',            str,  "ResNet50",            "Set the network to use.")
-add_arg('save_inference',   bool, False,                "Whether to save inference model or not")
-add_arg('resize_short_size',int,  256,                  "Set resize short size")
-add_arg('reader_thread',    int,  1,                    "The number of multi thread reader")
-add_arg('reader_buf_size',  int,  2048,                 "The buf size of multi thread reader")
-parser.add_argument('--image_mean', nargs='+', type=float, default=[0.485, 0.456, 0.406], help="The mean of input image data")
-parser.add_argument('--image_std', nargs='+', type=float, default=[0.229, 0.224, 0.225], help="The std of input image data")
-add_arg('crop_size',        int,  224,                  "The value of crop size")
-add_arg('topk',             int,  1,                    "topk")
-add_arg('label_path',       str,  "./utils/tools/readable_label.txt", "readable label filepath")
-add_arg('interpolation',    int,  None,                 "The interpolation mode")
-add_arg('padding_type',     str,  "SAME",               "Padding type of convolution")
-add_arg('use_se',           bool, True,                 "Whether to use Squeeze-and-Excitation module for EfficientNet.")
-# yapf: enable
+
+def inference(args, test_data_loader, exe, test_prog, test_fetch_list):
+    test_batch_time_record = []
+    test_batch_metrics_record = []
+    test_batch_id = 0
+    test_data_loader.start()
+    try:
+        while True:
+            t1 = time.time()
+            result = exe.run(program=test_prog, fetch_list=test_fetch_list)
+            t2 = time.time()
+            test_batch_elapse = t2 - t1
+            result = result[0][0]
+            pred_label = np.argsort(result)[::-1][:args.topk]
+            print(pred_label)
+
+    except fluid.core.EOFException:
+        test_data_loader.reset()
 
 
-def infer(args):
-    image_shape = [int(m) for m in args.image_shape.split(",")]
-    model_list = [m for m in dir(models) if "__" not in m]
-    assert args.model in model_list, "{} is not in lists: {}".format(args.model,
-                                                                     model_list)
-    assert os.path.isdir(args.pretrained_model
-                         ), "please load right pretrained model path for infer"
-    image = fluid.data(
-        name='image', shape=[None] + image_shape, dtype='float32')
-
-    if args.model.startswith('EfficientNet'):
-        model = models.__dict__[args.model](is_test=True,
-                                            padding_type=args.padding_type,
-                                            use_se=args.use_se)
-    else:
-        model = models.__dict__[args.model]()
-
-    if args.model == "GoogLeNet":
-        out, _, _ = model.net(input=image, class_dim=args.class_dim)
-    else:
-        out = model.net(input=image, class_dim=args.class_dim)
-        out = fluid.layers.softmax(out)
-
-    test_program = fluid.default_main_program().clone(for_test=True)
-
-    fetch_list = [out.name]
-
-    place = fluid.CUDAPlace(0) if args.use_gpu else fluid.CPUPlace()
+def infer(args, startup_program, test_program, test_data_loader,
+          test_fetch_list):
+    gpu_id = int(os.environ.get('FLAGS_selected_gpus', 0))
+    place = fluid.CUDAPlace(gpu_id) if args.use_gpu else fluid.CPUPlace()
     exe = fluid.Executor(place)
-    exe.run(fluid.default_startup_program())
-
-    fluid.io.load_persistables(exe, args.pretrained_model)
-    if args.save_inference:
-        fluid.io.save_inference_model(
-            dirname=args.model,
-            feeded_var_names=['image'],
-            main_program=test_program,
-            target_vars=out,
-            executor=exe,
-            model_filename='model',
-            params_filename='params')
-        print("model: ", args.model, " is already saved")
-        exit(0)
-
-    args.test_batch_size = 1
-    imagenet_reader = reader.ImageNetReader()
+    num_trainers = int(os.environ.get('PADDLE_TRAINERS_NUM', 1))
+    imagenet_reader = reader.ImageNetReader(0 if num_trainers > 1 else None)
     test_reader = imagenet_reader.test(settings=args)
-    feeder = fluid.DataFeeder(place=place, feed_list=[image])
-
-    TOPK = args.topk
-    assert os.path.exists(args.label_path), "Index file doesn't exist!"
-    f = open(args.label_path)
-    label_dict = {}
-    for item in f.readlines():
-        key = item.split(" ")[0]
-        value = [l.replace("\n", "") for l in item.split(" ")[1:]]
-        label_dict[key] = value
-
-    for batch_id, data in enumerate(test_reader()):
-        result = exe.run(test_program,
-                         fetch_list=fetch_list,
-                         feed=feeder.feed(data))
-        result = result[0][0]
-        pred_label = np.argsort(result)[::-1][:TOPK]
-        readable_pred_label = []
-        for label in pred_label:
-            readable_pred_label.append(label_dict[str(label)])
-        print("Test-{0}-score: {1}, class{2} {3}".format(batch_id, result[
-            pred_label], pred_label, readable_pred_label))
-        sys.stdout.flush()
-
-
-def main():
-    args = parser.parse_args()
-    print_arguments(args)
-    check_gpu()
-    check_version()
-    infer(args)
-
-
-if __name__ == '__main__':
-    main()
+    test_data_loader.set_sample_list_generator(test_reader, place)
+    inference(args, test_data_loader, exe, test_program, test_fetch_list)

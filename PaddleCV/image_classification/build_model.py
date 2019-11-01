@@ -49,7 +49,7 @@ def _basic_model(data, model, args, is_train):
     avg_cost = fluid.layers.mean(cost)
     acc_top1 = fluid.layers.accuracy(input=softmax_out, label=label, k=1)
     acc_top5 = fluid.layers.accuracy(input=softmax_out, label=label, k=5)
-    return [avg_cost, acc_top1, acc_top5]
+    return [avg_cost, acc_top1, acc_top5], softmax_out
 
 
 def _googlenet_model(data, model, args, is_train):
@@ -75,7 +75,7 @@ def _googlenet_model(data, model, args, is_train):
     acc_top1 = fluid.layers.accuracy(input=out0, label=label, k=1)
     acc_top5 = fluid.layers.accuracy(input=out0, label=label, k=5)
 
-    return [avg_cost, acc_top1, acc_top5]
+    return [avg_cost, acc_top1, acc_top5], out0
 
 
 def _mixup_model(data, model, args, is_train):
@@ -101,7 +101,7 @@ def _mixup_model(data, model, args, is_train):
     loss_b_mean = fluid.layers.mean(x=loss_b)
     cost = lam * loss_a_mean + (1 - lam) * loss_b_mean
     avg_cost = fluid.layers.mean(x=cost)
-    return [avg_cost]
+    return [avg_cost], softmax_out
 
 
 def create_model(model, args, is_train):
@@ -110,10 +110,10 @@ def create_model(model, args, is_train):
     data_loader, data = utility.create_data_loader(is_train, args)
 
     if args.model == "GoogLeNet":
-        loss_out = _googlenet_model(data, model, args, is_train)
+        loss_out, out = _googlenet_model(data, model, args, is_train)
     else:
         if args.use_mixup and is_train:
-            loss_out = _mixup_model(data, model, args, is_train)
+            loss_out, out = _mixup_model(data, model, args, is_train)
         else:
-            loss_out = _basic_model(data, model, args, is_train)
-    return data_loader, loss_out
+            loss_out, out = _basic_model(data, model, args, is_train)
+    return data_loader, loss_out, out
