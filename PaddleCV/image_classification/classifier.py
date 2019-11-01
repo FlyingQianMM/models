@@ -11,10 +11,9 @@ def path_join(dir_path, file_or_dir):
     res = os.path.join(dir_path, file_or_dir)
     return os.path.normpath(res)
 
-
-def merge_cfg(**kwargs):
+def merge_cfg(params):
     args = parse_args()
-    for k, v in kwargs.items():
+    for k, v in params.items():
         if hasattr(args, k):
             setattr(args, k, v)
     return args
@@ -41,8 +40,9 @@ class Classifier(object):
                                                                  pretrain_dir)
 
     def fit(self, data_dir, num_epochs=120, lr=0.1, batch_size=8):
-        cfg = merge_cfg(**locals())
+        cfg = merge_cfg(locals())
         cfg.class_dim = self.class_dim
+        cfg.test_batch_size = batch_size
         self.model_save_dir = path_join(self.work_dir, "saved_model")
         if self.use_pretrained_weights:
             cfg.pretrained_model = self.pretrained_weights_dir
@@ -61,23 +61,17 @@ class Classifier(object):
         self.train_res = train(cfg)
 
     def predict(self, img_file):
-        cfg = merge_cfg(**locals())
-        cfg.model = self.model_name
-        cfg.use_gpu = self.use_gpu
-        cfg.class_dim = self.class_dim
+        self.cfg.img_file = img_file
         check_gpu()
         check_version()
-        infer(cfg, self.train_res[0], self.train_res[1], self.train_res[2],
+        infer(self.cfg, self.train_res[0], self.train_res[1], self.train_res[2],
               self.train_res[4])
 
     def eval(self, data_dir):
-        cfg = merge_cfg(**locals())
-        cfg.model = self.model_name
-        cfg.use_gpu = self.use_gpu
-        cfg.class_dim = self.class_dim
+        self.cfg.data_dir = data_dir
         check_gpu()
         check_version()
-        eval(cfg, self.train_res[0], self.train_res[1], self.train_res[2],
+        eval(self.cfg, self.train_res[0], self.train_res[1], self.train_res[2],
              self.train_res[3])
 
     def load_model(self, model_dir):
@@ -88,13 +82,3 @@ class Classifier(object):
             self.exe = exe
         fluid.io.load_persistables(self.exe, model_dir)
 
-
-#    def save_inference_model(self):
-mymodel = Classifier(work_dir="myproject", model_name="ResNet18", use_pretrained_weights=True, num_classes=114)
-print(mymodel.pretrained_weights_dir)
-mymodel.fit(data_dir="/ssd3/jiangxiaobai/data0926", num_epochs=2, lr=0.05, batch_size=32)
-
-print("===============eval=============================")
-mymodel.eval(data_dir="/ssd3/jiangxiaobai/data0926")
-print('________________________________infer__________________________')
-mymodel.predict(img_file='/all/mini_data/kmeans_data/0/9.jpg')
