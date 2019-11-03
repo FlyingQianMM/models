@@ -49,7 +49,6 @@ class Classifier(object):
             remove_fc_vars(self.pretrained_weights_dir, self.model_name)
         cfg.model = self.model_name
         cfg.use_gpu = self.use_gpu
-        self.cfg = cfg
         cfg.model_save_dir = osp.join(self.work_dir, 'output')
         train_txt_path = osp.join(data_dir, 'train_list.txt')
         assert osp.exists(train_txt_path), \
@@ -58,6 +57,7 @@ class Classifier(object):
             full_lines = [line.strip() for line in flist]
             cfg.total_images = len(full_lines)
         check_args(cfg)
+        self.cfg = cfg
         self.train_res = train(cfg)
 
     def predict(self, img_file):
@@ -75,10 +75,36 @@ class Classifier(object):
              self.train_res[3])
 
     def load_model(self, model_dir):
-        if self.exe is None:
-            place = fluid.CUDAPlace(0) if self.use_gpu else fluid.CPUPlace()
-            exe = fluid.Executor(place)
-            exe.run(fluid.default_startup_program())
-            self.exe = exe
-        fluid.io.load_persistables(self.exe, model_dir)
+        assert os.path.exists(model_dir), \
+            'The model path {} is not exist!'.format(model_dir)
+        import reader 
+        cfg = merge_cfg(locals())
+        cfg.class_dim = self.class_dim
+        cfg.model = self.model_name
+        cfg.use_gpu = self.use_gpu
+        cfg.total_images = 1
+        cfg.batch_size = 1
+        check_args(cfg)
+        self.cfg = cfg
+        startup_prog = fluid.Program()
+        test_prog = fluid.Program()
+        test_out, res_out = build_program(
+            is_train=False,
+            main_prog=test_prog,
+            startup_prog=startup_prog,
+            args=self.cfg)
+        test_data_loader = test_out[-1]
+        test_fetch_vars = test_out[:-1]
+        test_fetch_list = [var.name for var in test_fetch_vars]
+        test_prog = test_prog.clone(for_test=True)
+        place = fluid.CUDAPlace(0) if self.cfg.use_gpu else fluid.CPUPlace()
+        exe = fluid.Executor(place)
+        exe.run(startup_prog)
+        fluid.io.load_persistables(exe, model_dir)
+        self.train_res = [startup_prog, test_prog, test_data_loader, test_fetch_list, res_out]
 
+madel_path = '/all/image_classification/output/ResNet18/'
+mymodel = Classifier(work_dir="myproject", model_name="ResNet18", num_classes=283)
+mymodel.load_model(madel_path)
+print('______________infer-------------------')
+mymodel.predict('/all/mini_data/kmeans_data/0/9.jpg')
