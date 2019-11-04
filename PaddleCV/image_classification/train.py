@@ -218,16 +218,17 @@ def train(args):
             train_data_loader.reset()
 
         if trainer_id == 0:
-            if args.use_ema:
-                print('ExponentialMovingAverage validate start...')
-                with ema.apply(exe):
-                    validate(args, test_data_loader, exe, test_prog,
-                             test_fetch_list, pass_id,
-                             train_batch_metrics_record)
-                print('ExponentialMovingAverage validate over!')
+            if os.path.isfile(os.path.join(args.data_dir, 'val_lilst.txt')):
+                if args.use_ema:
+                    print('ExponentialMovingAverage validate start...')
+                    with ema.apply(exe):
+                        validate(args, test_data_loader, exe, test_prog,
+                                 test_fetch_list, pass_id,
+                                 train_batch_metrics_record)
+                    print('ExponentialMovingAverage validate over!')
 
-            validate(args, test_data_loader, exe, test_prog, test_fetch_list,
-                     pass_id, train_batch_metrics_record)
+                validate(args, test_data_loader, exe, test_prog,
+                         test_fetch_list, pass_id, train_batch_metrics_record)
             #For now, save model per epoch.
             if pass_id % args.save_step == 0:
                 save_model(args, exe, train_prog, pass_id)

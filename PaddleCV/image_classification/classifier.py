@@ -76,6 +76,9 @@ class Classifier(object):
               self.train_res[4])
 
     def eval(self, data_dir):
+        assert os.path.isdir(
+            data_dir
+        ), "Data doesn't exist in {}, please load right path".format(data_dir)
         self.cfg.data_dir = data_dir
         check_gpu()
         check_version()
