@@ -13,7 +13,7 @@
 #limitations under the License.
 import paddle
 import paddle.fluid as fluid
-import utils.utility as utility
+import image_classification.utils.utility as utility
 
 
 def _calc_label_smoothing_loss(softmax_out, label, class_dim, epsilon):

@@ -26,10 +26,10 @@ import functools
 
 import paddle
 import paddle.fluid as fluid
-import reader
-import models
-from utils import *
-from build_model import create_model
+from image_classification import reader
+from image_classification import models
+from image_classification.utils import *
+from image_classification.build_model import create_model
 
 
 def validate(args, test_data_loader, exe, test_prog, test_fetch_list):

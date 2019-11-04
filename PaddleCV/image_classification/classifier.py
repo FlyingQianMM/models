@@ -1,15 +1,16 @@
 import os
-from imagenet_pretrained_weights import *
-from utils import *
-from train import *
-from eval import *
-from infer import *
 import paddle.fluid as fluid
+from image_classification.imagenet_pretrained_weights import *
+from image_classification.utils import *
+from image_classification.train import *
+from image_classification.eval import *
+from image_classification.infer import *
 
 
 def path_join(dir_path, file_or_dir):
     res = os.path.join(dir_path, file_or_dir)
     return os.path.normpath(res)
+
 
 def merge_cfg(params):
     args = parse_args()
@@ -40,9 +41,12 @@ class Classifier(object):
                                                                  pretrain_dir)
 
     def fit(self, data_dir, num_epochs=120, lr=0.1, batch_size=8):
+        assert os.path.isdir(
+            data_dir
+        ), "Data doesn't exist in {}, please load right path".format(data_dir)
         cfg = merge_cfg(locals())
         cfg.class_dim = self.class_dim
-        cfg.test_batch_size = batch_size
+        cfg.batch_size = batch_size
         self.model_save_dir = path_join(self.work_dir, "saved_model")
         if self.use_pretrained_weights:
             cfg.pretrained_model = self.pretrained_weights_dir
@@ -61,6 +65,10 @@ class Classifier(object):
         self.train_res = train(cfg)
 
     def predict(self, img_file):
+        assert os.path.exists(
+            img_file
+        ), "Image file doesn't exist in {}, please load right path".format(
+            img_file)
         self.cfg.img_file = img_file
         check_gpu()
         check_version()
@@ -68,6 +76,9 @@ class Classifier(object):
               self.train_res[4])
 
     def eval(self, data_dir):
+        assert os.path.isdir(
+            data_dir
+        ), "Data doesn't exist in {}, please load right path".format(data_dir)
         self.cfg.data_dir = data_dir
         check_gpu()
         check_version()
@@ -77,7 +88,7 @@ class Classifier(object):
     def load_model(self, model_dir):
         assert os.path.exists(model_dir), \
             'The model path {} is not exist!'.format(model_dir)
-        import reader 
+        from image_classification import reader
         cfg = merge_cfg(locals())
         cfg.class_dim = self.class_dim
         cfg.model = self.model_name
@@ -101,10 +112,6 @@ class Classifier(object):
         exe = fluid.Executor(place)
         exe.run(startup_prog)
         fluid.io.load_persistables(exe, model_dir)
-        self.train_res = [startup_prog, test_prog, test_data_loader, test_fetch_list, res_out]
-
-madel_path = '/all/image_classification/output/ResNet18/'
-mymodel = Classifier(work_dir="myproject", model_name="ResNet18", num_classes=283)
-mymodel.load_model(madel_path)
-print('______________infer-------------------')
-mymodel.predict('/all/mini_data/kmeans_data/0/9.jpg')
+        self.train_res = [
+            startup_prog, test_prog, test_data_loader, test_fetch_list, res_out
+        ]

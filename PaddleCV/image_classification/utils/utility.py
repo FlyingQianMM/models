@@ -33,7 +33,7 @@ import paddle.fluid as fluid
 from paddle.fluid.wrapped_decorator import signature_safe_contextmanager
 from paddle.fluid.framework import Program, program_guard, name_scope, default_main_program
 from paddle.fluid import unique_name, layers
-from utils import dist_utils
+from image_classification.utils import dist_utils
 
 
 def parse_args():
@@ -45,7 +45,7 @@ def parse_args():
     args = easydict.EasyDict({
         "use_gpu": True,
         "model_save_dir": "./output",
-        "data_dir": "./data/ILSVRC2012/",
+        "data_dir": None,
         "pretrained_model": None,
         "checkpoint": None,
         "print_step": 10,
@@ -197,7 +197,8 @@ def check_args(args):
             args.batch_size, fluid.core.get_cuda_device_count())
 
     # check data directory
-    assert os.path.isdir(
+    assert args.data_dir is None or \
+    os.path.isdir(
         args.data_dir
     ), "Data doesn't exist in {}, please load right path".format(args.data_dir)
 

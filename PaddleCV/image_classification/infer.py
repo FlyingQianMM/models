@@ -26,9 +26,9 @@ import functools
 
 import paddle
 import paddle.fluid as fluid
-import reader
-import models
-from utils import *
+from image_classification import reader
+from image_classification import models
+from image_classification.utils import *
 
 
 def inference(args, test_data_loader, exe, test_prog, test_fetch_list):
