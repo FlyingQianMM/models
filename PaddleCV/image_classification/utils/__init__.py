@@ -11,5 +11,5 @@
 #WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #See the License for the specific language governing permissions and
 #limitations under the License.
-from .optimizer import cosine_decay, lr_warmup, cosine_decay_with_warmup, exponential_decay_with_warmup, Optimizer, create_optimizer
-from .utility import parse_args, check_gpu, check_args, check_version, init_model, save_model, create_data_loader, print_info, best_strategy_compiled, init_model, save_model, ExponentialMovingAverage
+from image_classification.utils.optimizer import cosine_decay, lr_warmup, cosine_decay_with_warmup, exponential_decay_with_warmup, Optimizer, create_optimizer
+from image_classification.utils.utility import parse_args, check_gpu, check_args, check_version, init_model, save_model, create_data_loader, print_info, best_strategy_compiled, init_model, save_model, ExponentialMovingAverage

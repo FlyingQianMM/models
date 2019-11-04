@@ -21,7 +21,7 @@ import cv2
 
 import paddle
 from paddle import fluid
-from utils.autoaugment import ImageNetPolicy
+from image_classification.utils.autoaugment import ImageNetPolicy
 from PIL import Image
 
 policy = None
@@ -406,7 +406,7 @@ class ImageNetReader:
         img_file = settings.img_file
         assert os.path.isfile(
             img_file), "{} doesn't exist, please check image file path".format(
-                file_list)
+                img_file)
         return self._reader_creator(
             settings,
             None,

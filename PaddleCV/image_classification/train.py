@@ -38,10 +38,10 @@ set_paddle_flags({
 
 import paddle
 import paddle.fluid as fluid
-import reader
-from utils import *
-import models
-from build_model import create_model
+from image_classification import reader
+from image_classification.utils import *
+from image_classification import models
+from image_classification.build_model import create_model
 
 
 def build_program(is_train, main_prog, startup_prog, args):
