@@ -35,6 +35,8 @@ __all__ = [
 
 def bbox_eval(results,
               class_num,
+              save_name=None,
+              architecture=None,
               overlap_thresh=0.5,
               map_type='11point',
               is_bbox_normalized=False,
@@ -62,13 +64,19 @@ def bbox_eval(results,
                         map_type=map_type,
                         is_bbox_normalized=is_bbox_normalized,
                         evaluate_difficult=evaluate_difficult)
+    if save_name is not None:
+        eval_out = {}
+        eval_out['class_num'] = class_num
+        eval_out['architecture'] = architecture
+        eval_out['overlap_thresh'] = overlap_thresh
+        eval_out['is_bbox_normalized'] = is_bbox_normalized
+        eval_out['evaluate_difficult'] = evaluate_difficult
+        eval_out['metric'] = 'VOC'
+        gt_det = []
 
     for t in results:
         bboxes = t['bbox'][0]
         bbox_lengths = t['bbox'][1][0]
-
-        if bboxes.shape == (1, 1) or bboxes is None:
-            continue
 
         gt_boxes = t['gt_box'][0]
         gt_labels = t['gt_label'][0]
@@ -83,10 +91,16 @@ def bbox_eval(results,
                 gt_label = gt_labels[i]
                 difficult = None if difficults is None \
                                 else difficults[i]
-                bbox_num = bbox_lengths[i]
-                bbox = bboxes[bbox_idx: bbox_idx + bbox_num]
                 gt_box, gt_label, difficult = prune_zero_padding(
                                         gt_box, gt_label, difficult)
+                if bboxes.shape == (1, 1) or bboxes is None:
+                    if save_name is not None:
+                        gt_det.append([[], gt_box, gt_label, difficult])
+                    continue
+                bbox_num = bbox_lengths[i]
+                bbox = bboxes[bbox_idx: bbox_idx + bbox_num]
+                if save_name is not None:
+                    gt_det.append([bbox, gt_box, gt_label, difficult])
                 detection_map.update(bbox, gt_box, gt_label, difficult)
                 bbox_idx += bbox_num
         else:
@@ -95,22 +109,36 @@ def bbox_eval(results,
             bbox_idx = 0
             gt_box_idx = 0
             for i in range(len(bbox_lengths)):
-                bbox_num = bbox_lengths[i]
                 gt_box_num = gt_box_lengths[i]
-                bbox = bboxes[bbox_idx: bbox_idx + bbox_num]
                 gt_box = gt_boxes[gt_box_idx: gt_box_idx + gt_box_num]
                 gt_label = gt_labels[gt_box_idx: gt_box_idx + gt_box_num]
                 difficult = None if difficults is None else \
                             difficults[gt_box_idx: gt_box_idx + gt_box_num]
+                if bboxes.shape == (1, 1) or bboxes is None:
+                    if save_name is not None:
+                        gt_det.append([[], gt_box, gt_label, difficult])
+                    continue
+                bbox_num = bbox_lengths[i]
+                bbox = bboxes[bbox_idx: bbox_idx + bbox_num]
+                if save_name is not None:
+                    gt_det.append([bbox, gt_box, gt_label, difficult])
                 detection_map.update(bbox, gt_box, gt_label, difficult)
                 bbox_idx += bbox_num
                 gt_box_idx += gt_box_num
 
     logger.info("Accumulating evaluatation results...")
     detection_map.accumulate()
-    map_stat = 100. * detection_map.get_map()
-    logger.info("mAP({:.2f}, {}) = {:.2f}".format(overlap_thresh,
-                            map_type, map_stat))
+    map_ori, aps_ori = detection_map.get_map()
+    map_stat = 100. * map_ori
+#    logger.info("mAP({:.2f}, {}) = {:.2f}".format(overlap_thresh,
+#                            map_type, map_stat))
+    if save_name is not None:
+        eval_out['gt_det'] = gt_det
+        eval_out['map'] = map_stat
+        eval_out['aps'] = aps_ori
+        import pickle
+        with open(save_name, 'wb') as file:
+            pickle.dump(eval_out, file)
     return map_stat
 
 

@@ -22,10 +22,10 @@ import paddle.fluid as fluid
 from paddle.fluid.param_attr import ParamAttr
 from paddle.fluid.initializer import Normal, Constant
 from paddle.fluid.regularizer import L2Decay
-from ppdet.modeling.ops import (AnchorGenerator, RetinaTargetAssign,
+from ppcv.det.modeling.ops import (AnchorGenerator, RetinaTargetAssign,
                                 RetinaOutputDecoder)
 
-from ppdet.core.workspace import register
+from ppcv.det.core.workspace import register
 
 __all__ = ['RetinaHead']
 

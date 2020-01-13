@@ -72,6 +72,11 @@ class ParallelMappedDataset(ProxiedDataset):
             logger.info("Use multi-thread reader instead of "
                         "multi-process reader on Windows.")
             use_process = False
+        if use_process and sys.platform == "darwin":
+            logger.info("Use multi-thread reader instead of "
+                        "multi-process reader on macOS.")
+            use_process = False
+
 
         bufsize = self._worker_args['bufsize']
         if use_process:

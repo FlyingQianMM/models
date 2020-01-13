@@ -33,11 +33,13 @@ logger = logging.getLogger(__name__)
 class Reader(object):
     """Interface to make readers for training or evaluation"""
 
-    def __init__(self, data_cf, trans_conf, maxiter=-1):
+    def __init__(self, data_cf, trans_conf, fields=None, is_quant=False, maxiter=-1):
         self._data_cf = data_cf
         self._trans_conf = trans_conf
         self._maxiter = maxiter
         self._cname2cid = None
+        self.fields = fields
+        self.is_quant = is_quant
         assert isinstance(self._maxiter, Integral), "maxiter should be int"
 
     def _make_reader(self, mode, my_source=None):
@@ -75,6 +77,8 @@ class Reader(object):
         need_keys = {
             'is_padding',
             'coarsest_stride',
+            'is_quant',
+            'max_size',
             'random_shapes',
             'multi_scales',
             'use_padded_im_info',
@@ -101,7 +105,15 @@ class Reader(object):
             n = 0
             while True:
                 for _batch in batched_ds:
-                    yield _batch
+                    if self.is_quant:
+                        __batch = _batch[0]
+                        ___batch = list()
+                        for i, field in enumerate(self.fields):
+                            if field is not 'im_id':
+                                ___batch.append(__batch[i])
+                        yield ___batch
+                    else:
+                        yield _batch
                     n += 1
                     if maxit > 0 and n == maxit:
                         return
@@ -131,11 +143,14 @@ class Reader(object):
                mode,
                data_config,
                transform_config,
+               fields,
+               is_quant,
                max_iter=-1,
                my_source=None,
                ret_iter=True):
         """ create a specific reader """
-        reader = Reader({mode: data_config}, {mode: transform_config}, max_iter)
+        reader = Reader({mode: data_config}, {mode: transform_config},
+                        fields, is_quant, max_iter)
         if ret_iter:
             return reader._make_reader(mode, my_source)
         else:

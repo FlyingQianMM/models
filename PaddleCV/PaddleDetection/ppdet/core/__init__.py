@@ -12,6 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import ppdet.modeling
-import ppdet.optimizer
-import ppdet.data
+import ppcv.det.modeling
+import ppcv.det.optimizer
+import ppcv.det.data

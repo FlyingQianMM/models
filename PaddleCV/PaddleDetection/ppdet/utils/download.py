@@ -20,7 +20,7 @@ import os
 import os.path as osp
 import shutil
 import requests
-import tqdm
+#import tqdm
 import hashlib
 import tarfile
 import zipfile
@@ -217,11 +217,11 @@ def _dataset_exists(path, annotation, image_dir):
         return False
 
     if annotation:
-        annotation_path = osp.join(path, annotation)
-        if not osp.isfile(annotation_path):
+        #annotation_path = osp.join(path, annotation)
+        if not osp.isfile(annotation):
             logger.info("Config annotation {} is not a "
                         "file, dataset config is not "
-                        "valid".format(annotation_path))
+                        "valid".format(annotation))
             return False
     if image_dir:
         image_path = osp.join(path, image_dir)

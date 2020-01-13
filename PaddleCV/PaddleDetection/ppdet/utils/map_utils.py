@@ -22,7 +22,8 @@ import numpy as np
 import logging
 logger = logging.getLogger(__name__)
 
-__all__ = ['bbox_area', 'jaccard_overlap', 'DetectionMAP']
+__all__ = ['bbox_area', 'jaccard_overlap', 'DetectionMAP', \
+           'DetectionConfusionMatrix']
 
 
 def bbox_area(bbox, is_bbox_normalized):
@@ -135,7 +136,8 @@ class DetectionMAP(object):
         """
         self.class_score_poss = [[] for _ in range(self.class_num)]
         self.class_gt_counts = [0] * self.class_num
-        self.mAP = None
+        self.mAP = 0.0
+        self.APs = [0.0] * self.class_num
 
     def accumulate(self):
         """
@@ -143,8 +145,8 @@ class DetectionMAP(object):
         """
         mAP = 0.
         valid_cnt = 0
-        for score_pos, count in zip(self.class_score_poss,
-                                    self.class_gt_counts):
+        for id, (score_pos, count) in enumerate(zip(self.class_score_poss,
+                                              self.class_gt_counts)):
             if count == 0 or len(score_pos) == 0:
                 continue
 
@@ -152,9 +154,14 @@ class DetectionMAP(object):
                     self._get_tp_fp_accum(score_pos)
             precision = []
             recall = []
+            sorted_list = sorted(score_pos, key=lambda s: s[0], reverse=True)
+            #si = 0
+            #print('class ',  id)
             for ac_tp, ac_fp in zip(accum_tp_list, accum_fp_list):
+                #print(sorted_list[si][0], float(ac_tp) / (ac_tp + ac_fp), float(ac_tp) / count)
                 precision.append(float(ac_tp) / (ac_tp + ac_fp))
                 recall.append(float(ac_tp) / count)
+                #si += 1
 
             if self.map_type == '11point':
                 max_precisions = [0.] * 11
@@ -170,6 +177,7 @@ class DetectionMAP(object):
                             if max_precisions[j] < precision[i]:
                                 max_precisions[j] = precision[i]
                 mAP += sum(max_precisions) / 11.
+                self.APs[id] = sum(max_precisions) / 11.
                 valid_cnt += 1
             elif self.map_type == 'integral':
                 import math
@@ -181,6 +189,7 @@ class DetectionMAP(object):
                         ap += precision[i] * recall_gap
                         prev_recall = recall[i]
                 mAP += ap
+                self.APs[id] = ap
                 valid_cnt += 1
             else:
                 logger.error("Unspported mAP type {}".format(self.map_type))
@@ -194,7 +203,7 @@ class DetectionMAP(object):
         """
         if self.mAP is None:
             logger.error("mAP is not calculated.")
-        return self.mAP
+        return self.mAP, self.APs
 
     def _get_tp_fp_accum(self, score_pos_list):
         """

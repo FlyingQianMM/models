@@ -29,7 +29,9 @@ def build_post_map(coarsest_stride=1,
                    multi_scales=[],
                    use_padded_im_info=False,
                    enable_multiscale_test=False,
-                   num_scale=1):
+                   num_scale=1,
+                   is_quant=False,
+                   max_size=1333):
     """
     Build a mapper for post-processing batches
 
@@ -60,6 +62,11 @@ def build_post_map(coarsest_stride=1,
                 np.ceil(max_shape[1] / coarsest_stride) * coarsest_stride)
             max_shape[2] = int(
                 np.ceil(max_shape[2] / coarsest_stride) * coarsest_stride)
+        if is_quant:
+            max_shape[1] = int(
+                (np.ceil(max_size / coarsest_stride) + 2) * coarsest_stride)
+            max_shape[2] = int(
+                (np.ceil(max_size / coarsest_stride) + 2) * coarsest_stride)
         padding_batch = []
         for data in batch_data:
             im_c, im_h, im_w = data[0].shape[:]

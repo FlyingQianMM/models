@@ -23,7 +23,7 @@ import json
 import cv2
 import numpy as np
 import matplotlib
-matplotlib.use('Agg')
+#matplotlib.use('Agg')
 
 import logging
 logger = logging.getLogger(__name__)
@@ -67,6 +67,8 @@ def proposal_eval(results, anno_file, outfile, max_dets=(100, 300, 1000)):
 def bbox_eval(results,
               anno_file,
               outfile,
+              save_name=None,
+              architecture=None,
               with_background=True,
               is_bbox_normalized=False):
     assert 'bbox' in results[0]
@@ -78,6 +80,7 @@ def bbox_eval(results,
 
     # when with_background = True, mapping category to classid, like:
     #   background:0, first_class:1, second_class:2, ...
+
     clsid2catid = dict(
         {i + int(with_background): catid
          for i, catid in enumerate(cat_ids)})
@@ -93,13 +96,35 @@ def bbox_eval(results,
     with open(outfile, 'w') as f:
         json.dump(xywh_results, f)
 
-    map_stats = cocoapi_eval(outfile, 'bbox', coco_gt=coco_gt)
+    if save_name is not None:
+        eval_out = {}
+        eval_out['class_num'] = len(cat_ids) + int(with_background)
+        eval_out['architecture'] = architecture
+        eval_out['overlap_thresh'] = 0.5
+        eval_out['is_bbox_normalized'] = is_bbox_normalized
+        eval_out['evaluate_difficult'] = False
+        eval_out['metric'] = 'COCO'
+
+    map_stats, aps_ori, gt_det = cocoapi_eval(outfile, 'bbox', coco_gt=coco_gt)
+    if save_name is not None:
+        eval_out['gt_det'] = gt_det
+        eval_out['map'] = map_stats[1] * 100.
+        eval_out['aps'] = aps_ori
+        import pickle
+        with open(save_name, 'wb') as file:
+            pickle.dump(eval_out, file)
     # flush coco evaluation result
     sys.stdout.flush()
+    os.remove(outfile) 
     return map_stats
 
 
-def mask_eval(results, anno_file, outfile, resolution, thresh_binarize=0.5):
+def mask_eval(results,
+              anno_file,
+              outfile,
+              resolution,
+              save_name=None,
+              thresh_binarize=0.5):
     assert 'mask' in results[0]
     assert outfile.endswith('.json')
     from pycocotools.coco import COCO
@@ -115,8 +140,27 @@ def mask_eval(results, anno_file, outfile, resolution, thresh_binarize=0.5):
 
     with open(outfile, 'w') as f:
         json.dump(segm_results, f)
+    
+    if save_name is not None:
+        import pickle
+        with open(save_name, 'rb') as file:
+            eval_out = pickle.load(file)
 
-    cocoapi_eval(outfile, 'segm', coco_gt=coco_gt)
+    map_stats, aps_ori, gt_mask = cocoapi_eval(outfile, 'segm', coco_gt=coco_gt)
+
+    if save_name is not None:
+        eval_out['gt_mask'] = gt_mask
+        eval_out['mask_map'] = map_stats[1] * 100.
+        eval_out['mask_aps'] = aps_ori
+        import pickle
+        with open(save_name, 'wb') as file:
+            pickle.dump(eval_out, file)
+
+    # flush coco evaluation result
+    sys.stdout.flush()
+    os.remove(outfile) 
+    return map_stats
+
 
 
 def cocoapi_eval(jsonfile,
@@ -150,7 +194,72 @@ def cocoapi_eval(jsonfile,
     coco_eval.evaluate()
     coco_eval.accumulate()
     coco_eval.summarize()
-    return coco_eval.stats
+    
+    pr = coco_eval.eval['precision'][0, :, :, 0, 2]
+    precision = pr[pr>-1]
+    precision = precision.reshape([101, int(precision.shape[0] / 101)])
+    class_num = len(coco_eval.params.catIds)
+    APs = [None] * class_num
+    for i in range(class_num):
+        APs[i] = np.mean(precision[:, i])
+
+    def _toMask(anns, coco):
+        for ann in anns:
+            rle = coco.annToRLE(ann)
+            ann['segmentation'] = rle
+
+    gt_det = list()
+    p = coco_eval.params
+    gts = coco_eval.cocoGt.loadAnns(coco_eval.cocoGt.getAnnIds(imgIds=p.imgIds,
+                                                               catIds=p.catIds))
+    dts = coco_eval.cocoDt.loadAnns(coco_eval.cocoDt.getAnnIds(imgIds=p.imgIds,
+                                                               catIds=p.catIds))
+    if style == 'segm':
+        _toMask(gts, coco_eval.cocoGt)
+        _toMask(dts, coco_eval.cocoGt)
+
+    catid2clsid = {
+        cat: i
+        for i, cat in enumerate(p.catIds)
+    }
+    from collections import defaultdict
+    _gts = defaultdict(list)
+    _dts = defaultdict(list)
+    for gt in gts:
+        _gts[gt['image_id']].append(gt)
+    for dt in dts:
+        _dts[dt['image_id']].append(dt)
+    dl = []
+    gl = []
+    for imgId in p.imgIds:
+        det_bbox = list()
+        gt_bbox = list()
+        gt_label = list()
+        is_crowd = list()
+        _dt = _dts[imgId]
+        _gt = _gts[imgId]
+        for dt in _dt:
+            if style == 'bbox':
+                d = dt['bbox']
+            elif style == 'segm':
+                d = dt['segmentation']
+            label = catid2clsid[dt['category_id']]
+            if label not in dl:
+                dl.append(label)
+            score = dt['score']
+            det_bbox.append([label, score, d])
+        for gt in _gt:
+            label = catid2clsid[gt['category_id']]
+            if label not in gl:
+                gl.append(label)
+            if style == 'bbox':
+                gt_bbox.append(gt['bbox'])
+            elif style == 'segm':
+                gt_bbox.append(gt['segmentation'])
+            gt_label.append(label)
+            iscrowd = is_crowd.append(gt['iscrowd'])
+        gt_det.append([det_bbox, gt_bbox, gt_label, is_crowd])
+    return coco_eval.stats, APs, gt_det
 
 
 def proposal2out(results, is_bbox_normalized=False):
@@ -242,7 +351,8 @@ def bbox2out(results, clsid2catid, is_bbox_normalized=False):
     return xywh_res
 
 
-def mask2out(results, clsid2catid, resolution, thresh_binarize=0.5):
+def mask2out(results, clsid2catid, resolution, return_polygon=False,
+             thresh_binarize=0.5):
     import pycocotools.mask as mask_util
     scale = (resolution + 2.0) / resolution
 
@@ -307,11 +417,15 @@ def mask2out(results, clsid2catid, resolution, thresh_binarize=0.5):
 
                 im_mask[y0:y1, x0:x1] = resized_mask[(y0 - ymin):(y1 - ymin), (
                     x0 - xmin):(x1 - xmin)]
-                segm = mask_util.encode(
-                    np.array(
-                        im_mask[:, :, np.newaxis], order='F'))[0]
                 catid = clsid2catid[clsid]
-                segm['counts'] = segm['counts'].decode('utf8')
+                if return_polygon:
+                    segm, hier = cv2.findContours(im_mask, cv2.RETR_EXTERNAL,
+                                                  cv2.CHAIN_APPROX_SIMPLE)
+                else:
+                    segm = mask_util.encode(
+                        np.array(
+                            im_mask[:, :, np.newaxis], order='F'))[0]
+                    segm['counts'] = segm['counts'].decode('utf8')
                 coco_res = {
                     'image_id': im_id,
                     'category_id': catid,

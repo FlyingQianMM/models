@@ -21,7 +21,7 @@ import math
 from paddle import fluid
 from paddle.fluid.param_attr import ParamAttr
 
-from ppdet.core.workspace import register, serializable
+from ppcv.det.core.workspace import register, serializable
 from .resnext import ResNeXt
 
 __all__ = ['SENet', 'SENetC5']

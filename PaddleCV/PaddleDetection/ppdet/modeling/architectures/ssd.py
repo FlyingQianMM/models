@@ -20,9 +20,9 @@ from collections import OrderedDict
 
 import paddle.fluid as fluid
 
-from ppdet.experimental import mixed_precision_global_state
-from ppdet.core.workspace import register
-from ppdet.modeling.ops import SSDOutputDecoder
+from ppcv.det.experimental import mixed_precision_global_state
+from ppcv.det.core.workspace import register
+from ppcv.det.modeling.ops import SSDOutputDecoder
 
 __all__ = ['SSD']
 

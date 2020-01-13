@@ -16,7 +16,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from ppdet.core.workspace import register, serializable
+from ppcv.det.core.workspace import register, serializable
 from .resnet import ResNet
 
 __all__ = ['ResNeXt']

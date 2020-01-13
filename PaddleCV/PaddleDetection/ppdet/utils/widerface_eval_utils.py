@@ -19,8 +19,8 @@ from __future__ import print_function
 import os
 import numpy as np
 
-from ppdet.data.source.widerface_loader import widerface_label
-from ppdet.utils.coco_eval import bbox2out
+from ppcv.det.data.source.widerface_loader import widerface_label
+from ppcv.det.utils.coco_eval import bbox2out
 
 import logging
 logger = logging.getLogger(__name__)

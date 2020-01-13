@@ -18,8 +18,8 @@ from __future__ import print_function
 
 import paddle.fluid as fluid
 
-from ppdet.core.workspace import register
-from ppdet.modeling.ops import RoIAlign, RoIPool
+from ppcv.det.core.workspace import register
+from ppcv.det.modeling.ops import RoIAlign, RoIPool
 
 __all__ = ['RoIPool', 'RoIAlign', 'FPNRoIAlign']
 

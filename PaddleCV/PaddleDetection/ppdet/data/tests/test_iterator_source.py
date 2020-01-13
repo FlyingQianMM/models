@@ -18,7 +18,7 @@ import sys
 import logging
 
 import set_env
-from ppdet.data.source import IteratorSource
+from ppcv.det.data.source import IteratorSource
 
 
 def _generate_iter_maker(num=10):

@@ -28,7 +28,7 @@ import numpy as np
 import cv2
 from PIL import Image, ImageEnhance
 
-from ppdet.core.workspace import serializable
+from ppcv.det.core.workspace import serializable
 
 from .op_helper import (satisfy_sample_constraint, filter_and_process,
                         generate_sample_bbox, clip_bbox, data_anchor_sampling,

@@ -19,7 +19,7 @@ from __future__ import print_function
 from paddle import fluid
 from paddle.fluid.param_attr import ParamAttr
 
-from ppdet.core.workspace import register
+from ppcv.det.core.workspace import register
 
 __all__ = ['BlazeNet']
 

@@ -19,16 +19,16 @@ from __future__ import division
 import os
 import inspect
 
-from ppdet.core.workspace import register, serializable
-from ppdet.utils.download import get_dataset_path
+from ppcv.det.core.workspace import register, serializable
+from ppcv.det.utils.download import get_dataset_path
 
-from ppdet.data.reader import Reader
+from ppcv.det.data.reader import Reader
 # XXX these are for triggering the decorator
-from ppdet.data.transform.operators import (
+from ppcv.det.data.transform.operators import (
     DecodeImage, MixupImage, NormalizeBox, NormalizeImage, RandomDistort,
     RandomFlipImage, RandomInterpImage, ResizeImage, ExpandImage, CropImage,
     Permute, MultiscaleTestResize)
-from ppdet.data.transform.arrange_sample import (
+from ppcv.det.data.transform.arrange_sample import (
     ArrangeRCNN, ArrangeEvalRCNN, ArrangeTestRCNN, ArrangeSSD, ArrangeEvalSSD,
     ArrangeTestSSD, ArrangeYOLO, ArrangeEvalYOLO, ArrangeTestYOLO)
 
@@ -50,16 +50,18 @@ def _prepare_data_config(feed, args_path):
         annotation = getattr(feed.dataset, 'annotation', None)
         image_dir = getattr(feed.dataset, 'image_dir', None)
         dataset_dir = get_dataset_path(dataset_home, annotation, image_dir)
-        if annotation:
-            feed.dataset.annotation = os.path.join(dataset_dir, annotation)
-        if image_dir:
-            feed.dataset.image_dir = os.path.join(dataset_dir, image_dir)
-
+        feed.dataset.dataset_dir = dataset_home
+        #if annotation:
+        #    feed.dataset.annotation = os.path.join(dataset_dir, annotation)
+        #if image_dir:
+        #    feed.dataset.image_dir = os.path.join(dataset_dir, image_dir)
+        #feed.dataset.image_dir = dataset_home
     mixup_epoch = -1
     if getattr(feed, 'mixup_epoch', None) is not None:
         mixup_epoch = feed.mixup_epoch
 
     data_config = {
+        'DATA_DIR': feed.dataset.dataset_dir,
         'ANNO_FILE': feed.dataset.annotation,
         'IMAGE_DIR': feed.dataset.image_dir,
         'USE_DEFAULT_LABEL': feed.dataset.use_default_label,
@@ -80,14 +82,19 @@ def _prepare_data_config(feed, args_path):
     return data_config
 
 
-def create_reader(feed, max_iter=0, args_path=None, my_source=None):
+def create_reader(feed,
+                  max_iter=0,
+                  args_path=None,
+                  my_source=None,
+                  batch_size=None,
+                  is_quant=False):
     """
     Return iterable data reader.
 
     Args:
         max_iter (int): number of iterations.
         my_source (callable): callable function to create a source iterator
-            which is used to provide source data in 'ppdet.data.reader'
+            which is used to provide source data in 'ppcv.det.data.reader'
     """
 
     # if `DATASET_DIR` does not exists, search ~/.paddle/dataset for a directory
@@ -104,7 +111,7 @@ def create_reader(feed, max_iter=0, args_path=None, my_source=None):
             'use_process': use_process,
             'memsize': memsize
         },
-        'BATCH_SIZE': feed.batch_size,
+        'BATCH_SIZE': batch_size if batch_size else feed.batch_size,
         'DROP_LAST': feed.drop_last,
         'USE_PADDED_IM_INFO': feed.use_padded_im_info,
     }
@@ -119,6 +126,10 @@ def create_reader(feed, max_iter=0, args_path=None, my_source=None):
         transform_config['IS_PADDING'] = True
         if pad[0].pad_to_stride != 0:
             transform_config['COARSEST_STRIDE'] = pad[0].pad_to_stride
+        transform_config['IS_QUANT'] = is_quant
+        sample_transforms = feed.sample_transforms
+        resize_shape = [s for s in sample_transforms if isinstance(s, ResizeImage)]
+        transform_config['MAX_SIZE'] = resize_shape[0].max_size
     if any(rand_shape):
         transform_config['RANDOM_SHAPES'] = rand_shape[0].sizes
     if any(multi_scale):
@@ -143,9 +154,8 @@ def create_reader(feed, max_iter=0, args_path=None, my_source=None):
         op_dict['op'] = op.__class__.__name__
         ops.append(op_dict)
     transform_config['OPS'] = ops
-
-    return Reader.create(feed.mode, data_config, transform_config, max_iter,
-                         my_source)
+    return Reader.create(feed.mode, data_config, transform_config,
+                         feed.fields, is_quant, max_iter, my_source)
 
 
 # XXX batch transforms are only stubs for now, actually handled by `post_map`
@@ -452,7 +462,7 @@ class FasterRCNNTrainFeed(DataFeed):
                      'image', 'im_info', 'im_id', 'gt_box', 'gt_label',
                      'is_crowd'
                  ],
-                 image_shape=[3, 800, 1333],
+                 image_shape=[None, 3, None, None],
                  sample_transforms=[
                      DecodeImage(to_rgb=True),
                      RandomFlipImage(prob=0.5),
@@ -504,7 +514,7 @@ class FasterRCNNEvalFeed(DataFeed):
                                      COCO_VAL_IMAGE_DIR).__dict__,
                  fields=['image', 'im_info', 'im_id', 'im_shape', 'gt_box',
                          'gt_label', 'is_difficult'],
-                 image_shape=[3, 800, 1333],
+                 image_shape=[None, 3, None, None],
                  sample_transforms=[
                      DecodeImage(to_rgb=True),
                      NormalizeImage(mean=[0.485, 0.456, 0.406],
@@ -551,13 +561,14 @@ class FasterRCNNTestFeed(DataFeed):
                  dataset=SimpleDataSet(COCO_VAL_ANNOTATION,
                                        COCO_VAL_IMAGE_DIR).__dict__,
                  fields=['image', 'im_info', 'im_id', 'im_shape'],
-                 image_shape=[3, 800, 1333],
+                 image_shape=[None, 3, None, None],
                  sample_transforms=[
                      DecodeImage(to_rgb=True),
                      NormalizeImage(mean=[0.485, 0.456, 0.406],
                                     std=[0.229, 0.224, 0.225],
                                     is_scale=True,
                                     is_channel_first=False),
+                     ResizeImage(target_size=800, max_size=1333, interp=1),
                      Permute(to_bgr=False)
                  ],
                  batch_transforms=[PadBatch()],
@@ -598,7 +609,7 @@ class MaskRCNNTrainFeed(DataFeed):
                      'image', 'im_info', 'im_id', 'gt_box', 'gt_label',
                      'is_crowd', 'gt_mask'
                  ],
-                 image_shape=[3, 800, 1333],
+                 image_shape=[None, 3, None, None],
                  sample_transforms=[
                      DecodeImage(to_rgb=True),
                      RandomFlipImage(prob=0.5, is_mask_flip=True),
@@ -644,7 +655,7 @@ class MaskRCNNEvalFeed(DataFeed):
                  dataset=CocoDataSet(COCO_VAL_ANNOTATION,
                                      COCO_VAL_IMAGE_DIR).__dict__,
                  fields=['image', 'im_info', 'im_id', 'im_shape'],
-                 image_shape=[3, 800, 1333],
+                 image_shape=[None, 3, None, None],
                  sample_transforms=[
                      DecodeImage(to_rgb=True),
                      NormalizeImage(mean=[0.485, 0.456, 0.406],
@@ -696,7 +707,7 @@ class MaskRCNNTestFeed(DataFeed):
                  dataset=SimpleDataSet(COCO_VAL_ANNOTATION,
                                        COCO_VAL_IMAGE_DIR).__dict__,
                  fields=['image', 'im_info', 'im_id', 'im_shape'],
-                 image_shape=[3, 800, 1333],
+                 image_shape=[None, 3, None, None],
                  sample_transforms=[
                      DecodeImage(to_rgb=True),
                      NormalizeImage(
@@ -704,6 +715,7 @@ class MaskRCNNTestFeed(DataFeed):
                          std=[0.229, 0.224, 0.225],
                          is_scale=True,
                          is_channel_first=False),
+                     ResizeImage(target_size=800, max_size=1333, interp=1),
                      Permute(to_bgr=False, channel_first=True)
                  ],
                  batch_transforms=[PadBatch()],

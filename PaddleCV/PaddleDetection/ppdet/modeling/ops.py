@@ -17,7 +17,7 @@ from numbers import Integral
 from paddle import fluid
 from paddle.fluid.param_attr import ParamAttr
 from paddle.fluid.regularizer import L2Decay
-from ppdet.core.workspace import register, serializable
+from ppcv.det.core.workspace import register, serializable
 
 __all__ = [
     'AnchorGenerator', 'RPNTargetAssign', 'GenerateProposals', 'MultiClassNMS',

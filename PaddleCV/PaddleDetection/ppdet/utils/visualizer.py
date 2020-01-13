@@ -21,7 +21,7 @@ import numpy as np
 import pycocotools.mask as mask_util
 from PIL import Image, ImageDraw
 
-from .colormap import colormap
+from .colormap import get_color_map_list
 
 __all__ = ['visualize_results']
 
@@ -75,7 +75,8 @@ def draw_bbox(image, im_id, catid2name, bboxes, threshold):
     draw = ImageDraw.Draw(image)
 
     catid2color = {}
-    color_list = colormap(rgb=True)[:40]
+    label_list = list(catid2name.values())
+    color_list = get_color_map_list(len(label_list))
     for dt in np.array(bboxes):
         if im_id != dt['image_id']:
             continue
@@ -88,8 +89,7 @@ def draw_bbox(image, im_id, catid2name, bboxes, threshold):
         ymax = ymin + h
 
         if catid not in catid2color:
-            idx = np.random.randint(len(color_list))
-            catid2color[catid] = color_list[idx]
+            catid2color[catid] = color_list[label_list.index(catid2name[catid])]
         color = tuple(catid2color[catid])
 
         # draw bbox

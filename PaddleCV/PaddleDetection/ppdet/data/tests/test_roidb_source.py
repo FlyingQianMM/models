@@ -18,7 +18,7 @@ import sys
 import logging
 
 import set_env
-from ppdet.data.source import build_source
+from ppcv.det.data.source import build_source
 
 
 class TestRoiDbSource(unittest.TestCase):

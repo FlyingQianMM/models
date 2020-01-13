@@ -18,7 +18,8 @@ import numpy as np
 import xml.etree.ElementTree as ET
 
 
-def get_roidb(anno_path,
+def get_roidb(data_dir,
+              anno_path,
               sample_num=-1,
               cname2cid=None,
               with_background=True):
@@ -52,7 +53,7 @@ def get_roidb(anno_path,
         'cname2id' is a dict to map category name to class id
     """
 
-    data_dir = os.path.dirname(anno_path)
+    #data_dir = os.path.dirname(anno_path)
 
     records = []
     ct = 0
@@ -129,7 +130,8 @@ def get_roidb(anno_path,
     return [records, cname2cid]
 
 
-def load(anno_path,
+def load(data_dir,
+         anno_path,
          sample_num=-1,
          use_default_label=True,
          with_background=True):
@@ -164,7 +166,7 @@ def load(anno_path,
         'cname2id' is a dict to map category name to class id
     """
 
-    data_dir = os.path.dirname(anno_path)
+    #data_dir = os.path.dirname(anno_path)
 
     # mapping category name to class id
     # if with_background is True:
@@ -175,7 +177,7 @@ def load(anno_path,
     ct = 0
     cname2cid = {}
     if not use_default_label:
-        label_path = os.path.join(data_dir, 'label_list.txt')
+        label_path = os.path.join(data_dir, 'labels.txt')
         with open(label_path, 'r') as fr:
             label_id = int(with_background)
             for line in fr.readlines():

@@ -22,7 +22,7 @@ from paddle import fluid
 from paddle.fluid.param_attr import ParamAttr
 from paddle.fluid.regularizer import L2Decay
 
-from ppdet.core.workspace import register
+from ppcv.det.core.workspace import register
 
 __all__ = ['DarkNet']
 

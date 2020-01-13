@@ -21,9 +21,9 @@ from paddle.fluid.initializer import Normal, Xavier
 from paddle.fluid.regularizer import L2Decay
 from paddle.fluid.initializer import MSRA
 
-from ppdet.modeling.ops import MultiClassNMS
-from ppdet.modeling.ops import ConvNorm
-from ppdet.core.workspace import register
+from ppcv.det.modeling.ops import MultiClassNMS
+from ppcv.det.modeling.ops import ConvNorm
+from ppcv.det.core.workspace import register
 
 __all__ = ['CascadeBBoxHead']
 

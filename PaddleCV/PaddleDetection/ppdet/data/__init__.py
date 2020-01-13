@@ -39,7 +39,7 @@ from .dataset import Dataset
 from .reader import Reader
 import traceback
 if traceback.extract_stack()[0][
-        0] == 'ppdet/data/tools/generate_data_for_training.py':
+        0] == 'ppcv.det.data/tools/generate_data_for_training.py':
     __all__ = ['Dataset', 'Reader']
 else:
     from .data_feed import create_reader

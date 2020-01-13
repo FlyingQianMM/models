@@ -19,8 +19,8 @@ import logging
 import numpy as np
 
 import set_env
-import ppdet.data.transform as tf
-from ppdet.data.source import build_source
+import ppcv.det.data.transform as tf
+from ppcv.det.data.source import build_source
 
 logger = logging.getLogger(__name__)
 

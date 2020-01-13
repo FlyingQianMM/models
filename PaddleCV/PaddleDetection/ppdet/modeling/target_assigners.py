@@ -18,8 +18,8 @@ from __future__ import print_function
 
 from paddle import fluid
 
-from ppdet.core.workspace import register
-from ppdet.modeling.ops import BBoxAssigner, MaskAssigner
+from ppcv.det.core.workspace import register
+from ppcv.det.modeling.ops import BBoxAssigner, MaskAssigner
 
 __all__ = ['BBoxAssigner', 'MaskAssigner', 'CascadeBBoxAssigner']
 

@@ -20,9 +20,9 @@ import numpy as np
 import yaml
 
 import set_env
-from ppdet.data.reader import Reader
-from ppdet.data.source import build_source
-from ppdet.data.source import IteratorSource
+from ppcv.det.data.reader import Reader
+from ppcv.det.data.source import build_source
+from ppcv.det.data.source import IteratorSource
 
 
 class TestReader(unittest.TestCase):

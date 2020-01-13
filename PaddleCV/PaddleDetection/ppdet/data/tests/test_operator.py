@@ -16,7 +16,7 @@ import unittest
 import logging
 import numpy as np
 import set_env
-import ppdet.data.transform as tf
+import ppcv.det.data.transform as tf
 logging.basicConfig(level=logging.INFO)
 
 

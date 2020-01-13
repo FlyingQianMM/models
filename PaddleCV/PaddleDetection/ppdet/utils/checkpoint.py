@@ -55,7 +55,7 @@ def _get_weight_path(path):
         if num_trainers <= 1:
             path = get_weights_path(path)
         else:
-            from ppdet.utils.download import map_path, WEIGHTS_HOME
+            from ppcv.det.utils.download import map_path, WEIGHTS_HOME
             weight_path = map_path(path, WEIGHTS_HOME)
             lock_path = weight_path + '.lock'
             if not os.path.exists(weight_path):

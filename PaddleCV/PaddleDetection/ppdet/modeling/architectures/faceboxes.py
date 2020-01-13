@@ -22,8 +22,8 @@ from paddle import fluid
 from paddle.fluid.param_attr import ParamAttr
 from paddle.fluid.regularizer import L2Decay
 
-from ppdet.core.workspace import register
-from ppdet.modeling.ops import SSDOutputDecoder
+from ppcv.det.core.workspace import register
+from ppcv.det.modeling.ops import SSDOutputDecoder
 
 __all__ = ['FaceBoxes']
 

@@ -23,8 +23,8 @@ import time
 
 import paddle.fluid as fluid
 
-from ppdet.utils.voc_eval import bbox_eval as voc_bbox_eval
-from ppdet.utils.post_process import mstest_box_post_process, mstest_mask_post_process, box_flip
+from ppcv.det.utils.voc_eval import bbox_eval as voc_bbox_eval
+from ppcv.det.utils.post_process import mstest_box_post_process, mstest_mask_post_process, box_flip
 
 __all__ = ['parse_fetches', 'eval_run', 'eval_results', 'json_eval_results']
 
@@ -180,11 +180,14 @@ def eval_results(results,
                  resolution=None,
                  is_bbox_normalized=False,
                  output_directory=None,
-                 map_type='11point'):
+                 map_type='11point',
+                 save_name=None,
+                 architecture=None):
     """Evaluation for evaluation program results"""
     box_ap_stats = []
+    mask_ap_stats = []
     if metric == 'COCO':
-        from ppdet.utils.coco_eval import proposal_eval, bbox_eval, mask_eval
+        from ppcv.det.utils.coco_eval import proposal_eval, bbox_eval, mask_eval
         anno_file = getattr(feed.dataset, 'annotation', None)
         with_background = getattr(feed, 'with_background', True)
         if 'proposal' in results[0]:
@@ -201,6 +204,8 @@ def eval_results(results,
                 results,
                 anno_file,
                 output,
+                save_name,
+                architecture,
                 with_background,
                 is_bbox_normalized=is_bbox_normalized)
 
@@ -208,20 +213,24 @@ def eval_results(results,
             output = 'mask.json'
             if output_directory:
                 output = os.path.join(output_directory, 'mask.json')
-            mask_eval(results, anno_file, output, resolution)
+            mask_ap_stats = mask_eval(results, anno_file, output, resolution,
+                                      save_name)
     else:
         if 'accum_map' in results[-1]:
             res = np.mean(results[-1]['accum_map'][0])
             logger.info('mAP: {:.2f}'.format(res * 100.))
             box_ap_stats.append(res * 100.)
+            print('-----------accum_map---------')
         elif 'bbox' in results[0]:
-            box_ap = voc_bbox_eval(
+            box_map = voc_bbox_eval(
                 results,
                 num_classes,
+                save_name,
+                architecture,
                 is_bbox_normalized=is_bbox_normalized,
                 map_type=map_type)
-            box_ap_stats.append(box_ap)
-    return box_ap_stats
+            box_ap_stats.append(box_map)
+    return box_ap_stats, mask_ap_stats
 
 
 def json_eval_results(feed, metric, json_directory=None):
@@ -229,7 +238,7 @@ def json_eval_results(feed, metric, json_directory=None):
     cocoapi eval with already exists proposal.json, bbox.json or mask.json
     """
     assert metric == 'COCO'
-    from ppdet.utils.coco_eval import cocoapi_eval
+    from ppcv.det.utils.coco_eval import cocoapi_eval
     anno_file = getattr(feed.dataset, 'annotation', None)
     json_file_list = ['proposal.json', 'bbox.json', 'mask.json']
     if json_directory:

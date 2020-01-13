@@ -34,6 +34,7 @@ class RoiDbSource(Dataset):
     """
 
     def __init__(self,
+                 data_dir,
                  anno_file,
                  image_dir=None,
                  samples=-1,
@@ -59,6 +60,9 @@ class RoiDbSource(Dataset):
         """
         super(RoiDbSource, self).__init__()
         self._epoch = -1
+        assert os.path.isdir(data_dir), \
+                'data_dir {} is not a directory'.format(data_dir)
+        self.data_dir = data_dir
         assert os.path.isfile(anno_file) or os.path.isdir(anno_file), \
                 'anno_file {} is not a file or a directory'.format(anno_file)
         self._fname = anno_file
@@ -113,7 +117,7 @@ class RoiDbSource(Dataset):
         """ load data from file
         """
         from . import loader
-        records, cname2cid = loader.load(self._fname, self._samples,
+        records, cname2cid = loader.load(self.data_dir, self._fname, self._samples,
                                          self._with_background, True,
                                          self.use_default_label, self.cname2cid)
         self.cname2cid = cname2cid

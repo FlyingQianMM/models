@@ -21,8 +21,8 @@ from paddle.fluid.param_attr import ParamAttr
 from paddle.fluid.initializer import MSRA
 from paddle.fluid.regularizer import L2Decay
 
-from ppdet.core.workspace import register
-from ppdet.modeling.ops import ConvNorm
+from ppcv.det.core.workspace import register
+from ppcv.det.modeling.ops import ConvNorm
 
 __all__ = ['MaskHead']
 

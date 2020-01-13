@@ -23,7 +23,7 @@ from paddle import fluid
 import paddle.fluid.optimizer as optimizer
 import paddle.fluid.regularizer as regularizer
 
-from ppdet.core.workspace import register, serializable
+from ppcv.det.core.workspace import register, serializable
 
 __all__ = ['LearningRate', 'OptimizerBuilder']
 

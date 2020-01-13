@@ -82,7 +82,8 @@ def load_roidb(anno_file, sample_num=-1):
     return records, cname2cid
 
 
-def load(fname,
+def load(data_dir,
+         fname,
          samples=-1,
          with_background=True,
          with_cat2id=False,
@@ -127,10 +128,10 @@ def load(fname,
     elif os.path.isfile(fname):
         from . import voc_loader
         if use_default_label is None or cname2cid is not None:
-            records, cname2cid = voc_loader.get_roidb(fname, samples, cname2cid,
+            records, cname2cid = voc_loader.get_roidb(data_dir, fname, samples, cname2cid,
                                                 with_background=with_background)
         else:
-            records, cname2cid = voc_loader.load(fname, samples,
+            records, cname2cid = voc_loader.load(data_dir, fname, samples,
                                                  use_default_label,
                                                  with_background=with_background)
     else:

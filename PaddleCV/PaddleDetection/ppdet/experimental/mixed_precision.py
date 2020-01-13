@@ -20,8 +20,8 @@ from paddle.fluid.framework import Parameter
 from paddle.fluid import layers
 from paddle.fluid import core
 from paddle.fluid import unique_name
-import paddle.fluid.layer_helper_base as lhb
-import paddle.fluid.optimizer as optim
+from paddle.fluid import layer_helper_base as lhb
+from paddle.fluid import optimizer as optim
 
 __all__ = ['mixed_precision_global_state', 'mixed_precision_context',
            'StaticLossScale', 'DynamicLossScale']
@@ -59,7 +59,7 @@ class StaticLossScale(LossScale):
         .. code-block:: python
 
             from paddle import fluid
-            from ppdet.experimental import (mixed_precision_context,
+            from ppcv.det.experimental import (mixed_precision_context,
                                             StaticLossScale)
 
             with mixed_precision_context(StaticLossScale(8.), True) as ctx:
@@ -95,7 +95,7 @@ class DynamicLossScale(LossScale):
         .. code-block:: python
 
             from paddle import fluid
-            from ppdet.experimental import (mixed_precision_context,
+            from ppcv.det.experimental import (mixed_precision_context,
                                             DynamicLossScale)
 
             loss_scale = DynamicLossScale(8., 1000, 4.)
@@ -171,7 +171,7 @@ class mixed_precision_context(object):
         .. code-block:: python
 
             from paddle import fluid
-            from ppdet.experimental import mixed_precision_context
+            from ppcv.det.experimental import mixed_precision_context
 
             with mixed_precision_context('dynamic', True) as ctx:
                 # cast inputs to float16

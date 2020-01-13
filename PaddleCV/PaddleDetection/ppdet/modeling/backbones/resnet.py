@@ -24,7 +24,7 @@ from paddle.fluid.framework import Variable
 from paddle.fluid.regularizer import L2Decay
 from paddle.fluid.initializer import Constant
 
-from ppdet.core.workspace import register, serializable
+from ppcv.det.core.workspace import register, serializable
 from numbers import Integral
 
 from .name_adapter import NameAdapter

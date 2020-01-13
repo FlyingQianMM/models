@@ -20,8 +20,8 @@ from collections import OrderedDict
 
 import paddle.fluid as fluid
 
-from ppdet.experimental import mixed_precision_global_state
-from ppdet.core.workspace import register
+from ppcv.det.experimental import mixed_precision_global_state
+from ppcv.det.core.workspace import register
 
 __all__ = ['MaskRCNN']
 

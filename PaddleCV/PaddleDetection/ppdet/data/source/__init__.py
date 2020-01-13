@@ -48,7 +48,6 @@ def build_source(config):
         data_cf = config
 
     data_cf = {k.lower(): v for k, v in data_cf.items()}
-
     args = copy.deepcopy(data_cf)
     # defaut type is 'RoiDbSource'
     source_type = 'RoiDbSource'
